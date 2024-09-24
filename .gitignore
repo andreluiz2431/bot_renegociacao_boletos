@@ -1,0 +1,11 @@
+# dist
+dist/
+
+# build
+build/
+
+# environment variables
+.env
+
+# printers
+boletos.json
