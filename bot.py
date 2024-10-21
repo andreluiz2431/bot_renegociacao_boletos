@@ -78,11 +78,11 @@ async def verificar_boletos(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             else:
                 boletos_ativos.append(boleto)
 
-    mensagem = "📋 **Boletos Ativos:**\n"
+    mensagem = "📋 Boletos Ativos:\n"
     for boleto in boletos_ativos:
         mensagem += f"- ID: {boleto['id']}, Valor: R$ {boleto['valor']:.2f}, Vencimento: {boleto['vencimento']}\n"
 
-    mensagem += "\n⚠️ **Boletos Vencidos:**\n"
+    mensagem += "\n⚠️ Boletos Vencidos:\n"
     for boleto in boletos_vencidos:
         mensagem += (
             f"- ID: {boleto['id']}, Valor Original: R$ {boleto['valor']:.2f}, "
@@ -94,9 +94,9 @@ async def verificar_boletos(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     max_parcelas = calcular_parcelas(total_divida)
 
     mensagem += (
-        f"\n📌 **Total Vencido (com multa e juros):** R$ {total_vencidos:.2f}\n"
+        f"\n📌 Total Vencido (com multa e juros): R$ {total_vencidos:.2f}\n"
         f"Adicional de R$ 10,00 por cada boleto vencido há mais de 60 dias: R$ {custo_adicional:.2f}\n"
-        f"**Total a pagar:** R$ {total_divida:.2f}\n"
+        f"\n Total a pagar: R$ {total_divida:.2f}\n"
         f"Você pode parcelar em até {max_parcelas} vezes.\n"
         "Digite /renegociar X para escolher o número de parcelas desejado (X)."
     )
