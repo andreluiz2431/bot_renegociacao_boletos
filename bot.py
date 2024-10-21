@@ -58,15 +58,16 @@ async def verificar_boletos(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if not cliente:
         await update.message.reply_text('CPF não encontrado. Verifique e tente novamente.')
         return
-    
-    # Salvar o CPF no contexto para reutilização
+
     context.user_data['cpf'] = cpf
-    
+
     boletos = cliente['boletos']
     boletos_vencidos = []
     boletos_ativos = []
+    total_vencidos = 0
     hoje = datetime.now()
-    
+
+    # Separar boletos ativos e vencidos
     for boleto in boletos:
         vencimento = datetime.strptime(boleto['vencimento'], '%Y-%m-%d')
         if not boleto['pago']:
@@ -74,102 +75,75 @@ async def verificar_boletos(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 dias_vencidos = (hoje - vencimento).days
                 boleto['valor_corrigido'] = calcular_multa_juros(boleto['valor'], dias_vencidos)
                 boletos_vencidos.append(boleto)
+                total_vencidos += boleto['valor_corrigido']
             else:
                 boletos_ativos.append(boleto)
 
-    # Calcular o custo adicional de boletos vencidos há mais de 30 dias
+    # Construir mensagem com boletos ativos
+    mensagem = "📋 **Boletos Ativos:**\n"
+    if boletos_ativos:
+        for boleto in boletos_ativos:
+            mensagem += f"- ID: {boleto['id']}, Valor: R$ {boleto['valor']:.2f}, Vencimento: {boleto['vencimento']}\n"
+    else:
+        mensagem += "Nenhum boleto ativo encontrado.\n"
+
+    # Construir mensagem com boletos vencidos
+    mensagem += "\n⚠️ **Boletos Vencidos:**\n"
+    if boletos_vencidos:
+        for boleto in boletos_vencidos:
+            mensagem += (
+                f"- ID: {boleto['id']}, Valor Original: R$ {boleto['valor']:.2f}, "
+                f"Valor Corrigido: R$ {boleto['valor_corrigido']:.2f}, Vencimento: {boleto['vencimento']}\n"
+            )
+    else:
+        mensagem += "Nenhum boleto vencido encontrado.\n"
+
+    # Calcular custo adicional e total da dívida
     custo_adicional = calcular_custo_adicional_boletos(boletos_vencidos)
-
-    mensagem = "Boletos Ativos:\n"
-    for boleto in boletos_ativos:
-        mensagem += f"- ID: {boleto['id']}, Valor: R$ {boleto['valor']:.2f}, Vencimento: {boleto['vencimento']}\n"
-    
-    mensagem += "\nBoletos Vencidos:\n"
-    total_vencidos = 0
-    for boleto in boletos_vencidos:
-        mensagem += f"- ID: {boleto['id']}, Valor Original: R$ {boleto['valor']:.2f}, Valor Corrigido: R$ {boleto['valor_corrigido']:.2f}, Vencimento: {boleto['vencimento']}\n"
-        total_vencidos += boleto['valor_corrigido']
-    
-    mensagem += f"\nTotal Vencido (com multa e juros): R$ {total_vencidos:.2f}\n"
-    mensagem += f"Adicional de R$ 10,00 por cada boleto vencido há mais de 30 dias: R$ {custo_adicional:.2f}\n"
-    
     total_divida = total_vencidos + custo_adicional
-    mensagem += f"Total a pagar: R$ {total_divida:.2f}"
 
+    mensagem += (
+        f"\n📌 **Total Vencido (com multa e juros):** R$ {total_vencidos:.2f}\n"
+        f"Adicional de R$ 10,00 por cada boleto vencido há mais de 30 dias: R$ {custo_adicional:.2f}\n"
+        f"**Total a pagar:** R$ {total_divida:.2f}"
+    )
+
+    # Exibir mensagem com boletos e detalhes da dívida
     await update.message.reply_text(mensagem)
 
-    # Salvar o total da dívida no contexto
+    # Salvar valores no contexto para renegociação
     context.user_data['total_divida'] = total_divida
-    
-    # Oferece renegociação
-    renegociar = 'Digite /renegociar para renegociar toda a dívida.'
-    await update.message.reply_text(renegociar)
+    context.user_data['max_parcelas'] = calcular_parcelas(total_divida)
 
-# Função para renegociar a dívida
+    if boletos_vencidos:
+        await update.message.reply_text(
+            f"Você pode parcelar o total em até {context.user_data['max_parcelas']} vezes.\n"
+            "Digite /renegociar X para escolher o número de parcelas desejado (X)."
+        )
+
+# Função para renegociar com um número específico de parcelas
 async def renegociar_divida(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    total_divida = context.user_data.get('total_divida')
-    
-    if total_divida is None:
-        await update.message.reply_text('Ocorreu um erro ao encontrar sua dívida. Por favor, insira seu CPF novamente.')
+    args = context.args
+    if not args or not args[0].isdigit():
+        await update.message.reply_text("Use o comando /renegociar X, onde X é o número de parcelas desejadas.")
         return
 
-    max_parcelas = calcular_parcelas(total_divida)
-    
-    mensagem = f"O valor total para quitação é: R$ {total_divida:.2f}.\n"
-    if max_parcelas > 1:
-        mensagem += f"Você pode parcelar em até {max_parcelas} vezes."
-    else:
-        mensagem += "O valor total deve ser pago à vista, pois não é possível parcelar em valores menores que R$ 100,00."
-    
+    parcelas = int(args[0])
+    total_divida = context.user_data.get('total_divida')
+    max_parcelas = context.user_data.get('max_parcelas')
+
+    if not total_divida or not max_parcelas:
+        await update.message.reply_text("Erro ao recuperar a dívida. Verifique seu CPF novamente.")
+        return
+
+    if parcelas < 1 or parcelas > max_parcelas:
+        await update.message.reply_text(f"Você pode parcelar em até {max_parcelas} vezes.")
+        return
+
+    valor_parcela = (total_divida / parcelas) + 3
+    mensagem = f"Você escolheu {parcelas} parcelas. Cada parcela será de R$ {valor_parcela:.2f}."
+
     await update.message.reply_text(mensagem)
-
-    # Solicita ao usuário a quantidade de parcelas
-    await update.message.reply_text("Quantas parcelas você gostaria de fazer? Lembre-se que o valor mínimo de cada parcela é R$ 100,00.")
-    
-    # Atualiza a etapa no contexto
-    context.user_data['etapa'] = 'escolher_parcelas'
-
-# Função para processar a escolha de parcelas
-async def escolher_parcelas(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if context.user_data.get('etapa') == 'escolher_parcelas':
-        try:
-            parcelas = int(update.message.text)
-        except ValueError:
-            await update.message.reply_text("Por favor, insira um número válido de parcelas.")
-            return
-
-        total_divida = context.user_data['total_divida']
-        max_parcelas = calcular_parcelas(total_divida)
-
-        if parcelas < 1 or parcelas > max_parcelas:
-            await update.message.reply_text(f"Você pode parcelar em até {max_parcelas} vezes. Por favor, escolha um número válido.")
-        else:
-            context.user_data['parcelas'] = parcelas
-            await update.message.reply_text("Escolha a forma de pagamento: Pix, Cartão, ou Boleto.")
-
-            # Atualiza a etapa no contexto
-            context.user_data['etapa'] = 'escolher_forma_pagamento'
-
-# Função para processar a forma de pagamento
-async def escolher_forma_pagamento(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if context.user_data.get('etapa') == 'escolher_forma_pagamento':
-        forma_pagamento = update.message.text.lower()
-        parcelas = context.user_data['parcelas']
-        total_divida = context.user_data['total_divida']
-
-        if forma_pagamento == 'pix':
-            await update.message.reply_text(f"O valor total da dívida é R$ {total_divida:.2f}. Por favor, pague via Pix e envie o comprovante.")
-        
-        elif forma_pagamento == 'cartão':
-            valor_parcela = total_divida / parcelas
-            await update.message.reply_text(f"Você escolheu {parcelas} parcelas no cartão. Cada parcela será de R$ {valor_parcela:.2f}. Compareça à loja ou entre em contato para concluir a transação.")
-        
-        elif forma_pagamento == 'boleto':
-            valor_parcela = (total_divida / parcelas) + 3.00  # Exemplo de taxa adicional por boleto
-            await update.message.reply_text(f"Você escolheu {parcelas} parcelas no boleto. Cada parcela será de R$ {valor_parcela:.2f}. Os boletos serão enviados em breve.")
-        
-        else:
-            await update.message.reply_text("Forma de pagamento inválida. Por favor, escolha entre Pix, Cartão, ou Boleto.")
 
 def main() -> None:
     application = Application.builder().token(TOKEN).build()
@@ -177,8 +151,6 @@ def main() -> None:
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, verificar_boletos))
     application.add_handler(CommandHandler("renegociar", renegociar_divida))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, escolher_parcelas))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, escolher_forma_pagamento))
 
     application.run_polling()
 
