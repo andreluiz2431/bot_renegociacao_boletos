@@ -13,3 +13,6 @@ boletos.json
 # tests
 __pycache__
 .pytest_cache
+
+# credentials
+credentials.json
