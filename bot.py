@@ -49,25 +49,41 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text('Olá! Digite seu nome para verificar suas pendências.')
     context.user_data.clear()  # Limpa dados anteriores
 
-# Função para verificar boletos pelo NOME (não diferenciar maiúsculas e minúsculas e permitir busca parcial)
+# Função para verificar boletos pelo NOME ou CPF
 async def verificar_boletos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    nome = update.message.text.lower()
+    entrada = update.message.text
     boletos_data = carregar_boletos()
-    clientes_encontrados = [cliente for cliente in boletos_data if nome in cliente['cliente'].lower()]
 
-    if not clientes_encontrados:
-        await update.message.reply_text('Nome não encontrado. Verifique e tente novamente.')
-        return
-    
-    if len(clientes_encontrados) > 1:
-        await update.message.reply_text(
-            "Foram encontrados vários clientes com esse nome. Por favor, informe seu CPF para prosseguir."
-        )
-        context.user_data['clientes_pendentes'] = clientes_encontrados
-        return
+    # Verificar se estamos esperando um CPF
+    if 'clientes_pendentes' in context.user_data:
+        clientes_pendentes = context.user_data['clientes_pendentes']
+        cliente = next((cliente for cliente in clientes_pendentes if cliente['cpf'] == entrada), None)
 
-    # Caso apenas um cliente seja encontrado, processar os boletos
-    cliente = clientes_encontrados[0]
+        if not cliente:
+            await update.message.reply_text('CPF não encontrado. Verifique e tente novamente.')
+            return
+    else:
+        # Buscar clientes pelo nome (sem diferenciar maiúsculas/minúsculas)
+        nome = entrada.lower()
+        clientes_encontrados = [cliente for cliente in boletos_data if nome in cliente['cliente'].lower()]
+
+        if not clientes_encontrados:
+            await update.message.reply_text('Nome não encontrado. Verifique e tente novamente.')
+            return
+
+        if len(clientes_encontrados) > 1:
+            await update.message.reply_text(
+                "Foram encontrados vários clientes com esse nome. Por favor, informe seu CPF para prosseguir."
+            )
+            context.user_data['clientes_pendentes'] = clientes_encontrados
+            return
+
+        # Caso apenas um cliente seja encontrado
+        cliente = clientes_encontrados[0]
+
+    # Limpar dados temporários
+    context.user_data.pop('clientes_pendentes', None)
+
     context.user_data['cliente'] = cliente['cliente']
 
     boletos = cliente['boletos']
