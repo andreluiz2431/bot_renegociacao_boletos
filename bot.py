@@ -28,6 +28,8 @@ def calcular_multa_juros(valor, dias_vencidos):
 # Função para calcular o número de parcelas
 def calcular_parcelas(total_divida):
     max_parcelas = int(total_divida // 100)  # Cada parcela deve ser no mínimo R$ 100,00
+    if total_divida < 100:
+        return 1  # Se a dívida for menor que R$ 100, permitir 1 parcela
     return max_parcelas
 
 # Função para calcular custo adicional para boletos vencidos há mais de 30 dias
@@ -122,9 +124,14 @@ async def verificar_boletos(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         f"\n📌 Total Vencido (com multa e juros): R$ {total_vencidos:.2f}\n"
         f"Adicional de R$ 10,00 por cada boleto vencido há mais de 60 dias: R$ {custo_adicional:.2f}\n"
         f"\n Total a pagar: R$ {total_divida:.2f}\n"
-        f"Você pode parcelar em até {max_parcelas} vezes.\n"
-        "Digite /renegociar X para escolher o número de parcelas desejado (X)."
     )
+
+    if max_parcelas == 1:
+        mensagem += "Você deve pagar o valor em uma única parcela.\n"
+    else:
+        mensagem += f"Você pode parcelar em até {max_parcelas} vezes.\n"
+
+    mensagem += "Digite /renegociar X para escolher o número de parcelas desejado (X)."
 
     await update.message.reply_text(mensagem)
 
