@@ -46,20 +46,29 @@ def calcular_custo_adicional_boletos(boletos_vencidos):
 
 # Comando /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text('Olá! Digite seu CPF para verificar suas pendências.')
+    await update.message.reply_text('Olá! Digite seu nome para verificar suas pendências.')
     context.user_data.clear()  # Limpa dados anteriores
 
-# Função para verificar boletos pelo CPF
+# Função para verificar boletos pelo NOME (não diferenciar maiúsculas e minúsculas e permitir busca parcial)
 async def verificar_boletos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    cpf = update.message.text
+    nome = update.message.text.lower()
     boletos_data = carregar_boletos()
-    cliente = next((cliente for cliente in boletos_data if cliente['cpf'] == cpf), None)
+    clientes_encontrados = [cliente for cliente in boletos_data if nome in cliente['cliente'].lower()]
+
+    if not clientes_encontrados:
+        await update.message.reply_text('Nome não encontrado. Verifique e tente novamente.')
+        return
     
-    if not cliente:
-        await update.message.reply_text('CPF não encontrado. Verifique e tente novamente.')
+    if len(clientes_encontrados) > 1:
+        await update.message.reply_text(
+            "Foram encontrados vários clientes com esse nome. Por favor, informe seu CPF para prosseguir."
+        )
+        context.user_data['clientes_pendentes'] = clientes_encontrados
         return
 
-    context.user_data['cpf'] = cpf
+    # Caso apenas um cliente seja encontrado, processar os boletos
+    cliente = clientes_encontrados[0]
+    context.user_data['cliente'] = cliente['cliente']
 
     boletos = cliente['boletos']
     boletos_vencidos = []
@@ -118,7 +127,7 @@ async def renegociar_divida(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     max_parcelas = context.user_data.get('max_parcelas')
 
     if not total_divida or not max_parcelas:
-        await update.message.reply_text("Erro ao recuperar a dívida. Verifique seu CPF novamente.")
+        await update.message.reply_text("Erro ao recuperar a dívida. Verifique seu nome novamente.")
         return
 
     if parcelas < 1 or parcelas > max_parcelas:
