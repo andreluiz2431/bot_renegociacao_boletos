@@ -21,7 +21,7 @@ def carregar_boletos():
 
 # Função para calcular multa e juros
 def calcular_multa_juros(valor, dias_vencidos):
-    multa = 0.01 * valor  # 1% de multa
+    multa = 0.05 * valor  # 5% de multa
     juros = 0.0033 * dias_vencidos * valor  # 0,33% ao dia
     return valor + multa + juros
 
@@ -43,6 +43,8 @@ def calcular_custo_adicional_boletos(boletos_vencidos):
         
         if dias_vencidos >= 60:
             custo_adicional += 10  # Adiciona R$ 10,00 por boleto vencido há mais de 60 dias
+        elif dias_vencidos >= 30:
+            custo_adicional += 6  # Adiciona R$ 6,00 por boleto vencido há mais de 30 dias
 
     return custo_adicional
 
