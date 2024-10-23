@@ -15,9 +15,16 @@ if not TOKEN:
     raise ValueError("O token do bot não foi encontrado. Verifique seu arquivo .env.")
 
 # Carregar boletos de um arquivo JSON
+#def carregar_boletos():
+#    with open('boletos.json', 'r') as file:
+#        return json.load(file)
+
+# Carregar boletos de uma variável de ambiente
 def carregar_boletos():
-    with open('boletos.json', 'r') as file:
-        return json.load(file)
+    boletos_json = os.getenv('BOLETOS_JSON')
+    if not boletos_json:
+        raise ValueError("Boletos JSON não encontrado. Verifique as variáveis de ambiente.")
+    return json.loads(boletos_json)
 
 # Função para calcular multa e juros
 def calcular_multa_juros(valor, dias_vencidos):
