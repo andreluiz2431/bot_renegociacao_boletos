@@ -113,8 +113,9 @@ async def verificar_boletos(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 total_vencidos += boleto['valor_corrigido']
             else:
                 boletos_ativos.append(boleto)
+    mensagem = f"Nome do cliente: {cliente['cliente']}"
 
-    mensagem = "📋 Boletos Ativos:\n"
+    mensagem += "📋 Boletos Ativos:\n"
     for boleto in boletos_ativos:
         mensagem += f"- ID: {boleto['id']}, Valor: R$ {boleto['valor']:.2f}, Vencimento: {boleto['vencimento']}\n"
 
